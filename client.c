@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include "proto.h"
 #include "string.h"
 #include "aes.h"
@@ -19,19 +20,19 @@ char nickname[LENGTH_NAME] = {};
 void catch_ctrl_c_and_exit(int sig) {
     flag = 1;
 }
-unsigned char key[32], iv[12];
+int encryptedTextLen = 0;
+_Atomic unsigned char key[32], iv[12];
 void recv_msg_handler() {
-    char nameOfClient[LENGTH_NAME] = {};
     char receivedMessage[LENGTH_SEND] = {};
+    char plaintext[LENGTH_MSG] = {};
     while (1) {
-        //Recieve name first and print it
         int receive_message = recv(sockfd, receivedMessage, LENGTH_SEND, 0);
         //And once we recieve it, decrypt it
         /******Decryption starts********/
-        
+        int plainTextLen = decrypt((unsigned char*)receivedMessage, receive_message, (unsigned char*)key, (unsigned char*)iv, (unsigned char*)plaintext);
         /******Decryption ends********/
         if (receive_message > 0) {
-            printf("\r%s\n", receivedMessage);
+            printf("\r<Them>: %s\n", plaintext);
             str_overwrite_stdout();
         } else if (receive_message == 0) {
             break;
@@ -44,7 +45,6 @@ void recv_msg_handler() {
 void send_msg_handler() {
     char message[LENGTH_MSG] = {};
     char cipherMessage[LENGTH_MSG];
-    int encryptedTextLen = 0;
     while (1) {
         str_overwrite_stdout();
         while (fgets(message, LENGTH_MSG, stdin) != NULL) {
@@ -57,11 +57,12 @@ void send_msg_handler() {
         }
         //Before sending the message we want to encrypt it.
         /******Encryption starts********/
-        rand_str(key, 33-1);
-        rand_str(iv, 13-1);
+        printf("Modifying keys\n");
+        rand_str((unsigned char*)key, 33-1);
+        rand_str((unsigned char*)iv, 13-1);
         encryptedTextLen = encrypt((unsigned char*)message, LENGTH_MSG, (unsigned char*)key, (unsigned char*)iv, (unsigned char*)cipherMessage);
         /******Encryption ends here********/
-        send(sockfd, message, LENGTH_MSG, 0);
+        send(sockfd, cipherMessage, LENGTH_MSG, 0);
         if (strcmp(message, "exit") == 0) {
             break;
         }

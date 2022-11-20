@@ -8,8 +8,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <openssl/bio.h>
 #include "proto.h"
 #include "server.h"
+#include "aes.h"
 
 // Global variables
 int server_sockfd = 0, client_sockfd = 0;
@@ -28,13 +30,14 @@ void catch_ctrl_c_and_exit(int sig) {
     exit(EXIT_SUCCESS);
 }
 
-void send_to_all_clients(ClientList *np, char tmp_buffer[], int is_encrypted) {
+void send_to_all_clients(ClientList *np, char tmp_buffer[]) {
     ClientList *tmp = root->link;
     while (tmp != NULL) {
         if (np->data != tmp->data) { // send to all clients except itself.
-            printf("Send to sockfd %d: \"%s\" \n", tmp->data, tmp_buffer);
-            if (is_encrypted == 0 || is_encrypted == 2 || is_encrypted == 3) //If not encrypted, simply send the data
-                send(tmp->data, tmp_buffer, LENGTH_SEND, 0);
+            printf("Send to sockfd %d: ",tmp->data);
+            BIO_dump_fp(stdout, tmp_buffer, strlen(tmp_buffer));
+            send(tmp->data, tmp_buffer, LENGTH_SEND, 0);
+            
         }
         tmp = tmp->link;
     }
@@ -45,17 +48,17 @@ void client_handler(void *p_client) {
     char nickname[LENGTH_NAME] = {};
     char recv_buffer[LENGTH_MSG] = {};
     char send_buffer[LENGTH_SEND] = {};
+    char name_buffer[LENGTH_SEND] = {};
     ClientList *np = (ClientList *)p_client;
-    int is_encrypted = 0;
     // Naming
     if (recv(np->data, nickname, LENGTH_NAME, 0) <= 0 || strlen(nickname) < 2 || strlen(nickname) >= LENGTH_NAME-1) {
         printf("%s didn't input name.\n", np->ip);
         leave_flag = 1;
     } else {
-        strncpy(np->name, nickname, LENGTH_NAME);
-        printf("%s has joined the chatroom.\n", np->name);
-        sprintf(send_buffer, "%s has joined the chatroom.", np->name);
-        send_to_all_clients(np, send_buffer, is_encrypted);
+        // strncpy(np->name, nickname, LENGTH_NAME);
+        // printf("%s has joined the chatroom.\n", np->name);
+        // sprintf(send_buffer, "%s has joined the chatroom.", np->name);
+        // send_to_all_clients(np, send_buffer);
     }
 
     // Conversation
@@ -68,19 +71,16 @@ void client_handler(void *p_client) {
             if (strlen(recv_buffer) == 0) {
                 continue;
             }
-            is_encrypted = 1;
-            sprintf(send_buffer, "%s: %s", np->name, recv_buffer);
-        } else if (receive == 0 || strcmp(recv_buffer, "exit") == 0) {
-            is_encrypted = 2;
-            printf("%s left the chatroom.\n", np->name);
-            sprintf(send_buffer, "%s left the chatroom.", np->name);
-            leave_flag = 1;
+            sprintf(send_buffer, "%s", recv_buffer);
+        // } else if (receive == 0 || strcmp(recv_buffer, "exit") == 0) {
+        //     printf("%s left the chatroom.\n", np->name);
+        //     sprintf(send_buffer, "%s left the chatroom.", np->name);
+        //     leave_flag = 1;
         } else {
-            is_encrypted = 3;
-            printf("Fatal Error: -1\n");
+            printf("Someone disconnected\n");
             leave_flag = 1;
         }
-        send_to_all_clients(np, send_buffer, is_encrypted);
+        send_to_all_clients(np, send_buffer);
     }
 
     // Remove Node
@@ -118,7 +118,7 @@ int main()
 
     // Bind and Listen
     bind(server_sockfd, (struct sockaddr *)&server_info, s_addrlen);
-    listen(server_sockfd, 5);
+    listen(server_sockfd, 2);
 
     // Print Server IP
     getsockname(server_sockfd, (struct sockaddr*) &server_info, (socklen_t*) &s_addrlen);

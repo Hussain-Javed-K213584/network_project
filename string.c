@@ -12,6 +12,6 @@ void str_trim_lf (char* arr, int length) {
 }
 
 void str_overwrite_stdout() {
-    printf("\r%s", "> ");
+    printf("\r%s", "<YOU>: ");
     fflush(stdout);
 }
