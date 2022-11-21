@@ -20,6 +20,10 @@ FILE* fp1, *fp2;
 unsigned char key[KEY_LEN], iv[IV_LEN];
 
 void catch_ctrl_c_and_exit(int sig) {
+    fp1 = fopen("keys.bin", "w+");
+    fp2 = fopen("iv.bin", "w+");
+    fprintf(fp1, "%s", ""); //destroy data
+    fprintf(fp2, "%s", "");
     flag = 1;
 }
 int encryptedTextLen = 0;
@@ -35,10 +39,6 @@ void recv_msg_handler() {
         fclose(fp1);
         fscanf(fp2, "%s", iv);
         fclose(fp2);
-        fp1 = fopen("keys.bin", "w+");
-        fp2 = fopen("iv.bin", "w+");
-        fprintf(fp1, "%s", ""); //destroy data
-        fprintf(fp2, "%s", "");
         fclose(fp1);
         fclose(fp2);
         //And once we recieve it, decrypt it
