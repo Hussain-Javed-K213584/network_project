@@ -16,17 +16,31 @@
 volatile sig_atomic_t flag = 0;
 int sockfd = 0;
 char nickname[LENGTH_NAME] = {};
+FILE* fp1, *fp2;
+unsigned char key[KEY_LEN], iv[IV_LEN];
 
 void catch_ctrl_c_and_exit(int sig) {
     flag = 1;
 }
 int encryptedTextLen = 0;
-_Atomic unsigned char key[32], iv[12];
 void recv_msg_handler() {
     char receivedMessage[LENGTH_SEND] = {};
     char plaintext[LENGTH_MSG] = {};
     while (1) {
         int receive_message = recv(sockfd, receivedMessage, LENGTH_SEND, 0);
+        fp1 = fopen("keys.bin", "r+");
+        fp2 = fopen("iv.bin", "r+");
+        size_t read = 0;
+        fscanf(fp1, "%s", key);
+        fclose(fp1);
+        fscanf(fp2, "%s", iv);
+        fclose(fp2);
+        fp1 = fopen("keys.bin", "w+");
+        fp2 = fopen("iv.bin", "w+");
+        fprintf(fp1, "%s", ""); //destroy data
+        fprintf(fp2, "%s", "");
+        fclose(fp1);
+        fclose(fp2);
         //And once we recieve it, decrypt it
         /******Decryption starts********/
         int plainTextLen = decrypt((unsigned char*)receivedMessage, receive_message, (unsigned char*)key, (unsigned char*)iv, (unsigned char*)plaintext);
@@ -57,9 +71,14 @@ void send_msg_handler() {
         }
         //Before sending the message we want to encrypt it.
         /******Encryption starts********/
-        printf("Modifying keys\n");
-        rand_str((unsigned char*)key, 33-1);
-        rand_str((unsigned char*)iv, 13-1);
+        rand_str((unsigned char*)key, KEY_LEN-1);
+        rand_str((unsigned char*)iv, KEY_LEN-1);
+        fp1 = fopen("keys.bin", "w+");
+        fprintf(fp1, "%s", key);
+        fclose(fp1);
+        fp2 = fopen("iv.bin", "w+");
+        fprintf(fp2, "%s", iv);
+        fclose(fp2);
         encryptedTextLen = encrypt((unsigned char*)message, LENGTH_MSG, (unsigned char*)key, (unsigned char*)iv, (unsigned char*)cipherMessage);
         /******Encryption ends here********/
         send(sockfd, cipherMessage, LENGTH_MSG, 0);
@@ -116,19 +135,16 @@ int main()
     //Send name encrypted
     
     send(sockfd, nickname, LENGTH_NAME, 0);
-
     pthread_t send_msg_thread;
     if (pthread_create(&send_msg_thread, NULL, (void *) send_msg_handler, NULL) != 0) {
         printf ("Create pthread error!\n");
         exit(EXIT_FAILURE);
     }
-
     pthread_t recv_msg_thread;
     if (pthread_create(&recv_msg_thread, NULL, (void *) recv_msg_handler, NULL) != 0) {
         printf ("Create pthread error!\n");
         exit(EXIT_FAILURE);
     }
-
     while (1) {
         if(flag) {
             printf("\nBye\n");
