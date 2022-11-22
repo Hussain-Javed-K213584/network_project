@@ -9,9 +9,11 @@
                 "-g",
                 "${file}",
                 "aes.c",
+                "string.c",
                 "-o",
                 "${fileDirname}/${fileBasenameNoExtension}",
-                "-lcrypto"
+                "-lcrypto",
+                "-pthread"
                 
             ],
             "options": {

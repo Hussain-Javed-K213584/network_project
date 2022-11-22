@@ -63,6 +63,10 @@ void client_handler(void *p_client) {
 
     // Conversation
     while (1) {
+        memset(nickname, 0 ,sizeof(nickname));
+        memset(recv_buffer, 0, sizeof(recv_buffer));
+        memset(send_buffer, 0, sizeof(send_buffer));
+        memset(name_buffer, 0, sizeof(name_buffer));
         if (leave_flag) {
             break;
         }

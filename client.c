@@ -17,34 +17,42 @@ volatile sig_atomic_t flag = 0;
 int sockfd = 0;
 char nickname[LENGTH_NAME] = {};
 FILE* fp1, *fp2;
-unsigned char key[KEY_LEN], iv[IV_LEN];
 
 void catch_ctrl_c_and_exit(int sig) {
     fp1 = fopen("keys.bin", "w+");
     fp2 = fopen("iv.bin", "w+");
     fprintf(fp1, "%s", ""); //destroy data
     fprintf(fp2, "%s", "");
+    fclose(fp1);
+    fclose(fp2);
     flag = 1;
 }
-int encryptedTextLen = 0;
 void recv_msg_handler() {
-    char receivedMessage[LENGTH_SEND] = {};
-    char plaintext[LENGTH_MSG] = {};
+    unsigned char receivedMessage[CIPHER_LEN] = {};
+    unsigned char plaintext[CIPHER_LEN] = {};
+    unsigned char key[KEY_LEN], iv[IV_LEN];
     while (1) {
-        int receive_message = recv(sockfd, receivedMessage, LENGTH_SEND, 0);
+        memset(receivedMessage, 0, sizeof(receivedMessage));
+        memset(plaintext, 0, sizeof(plaintext));
+        memset(key, 0, sizeof(key));
+        memset(iv, 0, sizeof(iv));
+        again:
+        int receive_message = recv(sockfd, receivedMessage, CIPHER_LEN, 0);
         fp1 = fopen("keys.bin", "r+");
         fp2 = fopen("iv.bin", "r+");
-        size_t read = 0;
+        //DMA
         fscanf(fp1, "%s", key);
         fclose(fp1);
         fscanf(fp2, "%s", iv);
         fclose(fp2);
-        fclose(fp1);
-        fclose(fp2);
         //And once we recieve it, decrypt it
         /******Decryption starts********/
-        int plainTextLen = decrypt((unsigned char*)receivedMessage, receive_message, (unsigned char*)key, (unsigned char*)iv, (unsigned char*)plaintext);
+        int cipher_len = strlen((char*)receivedMessage);
+        int plainTextLen = decrypt(receivedMessage, cipher_len, key, iv, plaintext);
+        plaintext[plainTextLen] = '\0';
         /******Decryption ends********/
+        if (cipher_len == 0)
+            goto again;
         if (receive_message > 0) {
             printf("\r<Them>: %s\n", plaintext);
             str_overwrite_stdout();
@@ -58,8 +66,13 @@ void recv_msg_handler() {
 
 void send_msg_handler() {
     char message[LENGTH_MSG] = {};
-    char cipherMessage[LENGTH_MSG];
+    unsigned char cipherMessage[CIPHER_LEN];
+    unsigned char key[KEY_LEN], iv[IV_LEN];
     while (1) {
+        memset(message, 0, sizeof(message));
+        memset(cipherMessage, 0, sizeof(cipherMessage));
+        memset(key, 0, sizeof(key));
+        memset(iv, 0, sizeof(iv));
         str_overwrite_stdout();
         while (fgets(message, LENGTH_MSG, stdin) != NULL) {
             str_trim_lf(message, LENGTH_MSG);
@@ -71,17 +84,22 @@ void send_msg_handler() {
         }
         //Before sending the message we want to encrypt it.
         /******Encryption starts********/
-        rand_str((unsigned char*)key, KEY_LEN-1);
-        rand_str((unsigned char*)iv, KEY_LEN-1);
+        //Alocate space for key and iv
+        //generate random string
+        rand_str((unsigned char*)key, 32);
+        rand_str((unsigned char*)iv, 16);
+        //save key and iv in file
         fp1 = fopen("keys.bin", "w+");
         fprintf(fp1, "%s", key);
         fclose(fp1);
         fp2 = fopen("iv.bin", "w+");
         fprintf(fp2, "%s", iv);
         fclose(fp2);
-        encryptedTextLen = encrypt((unsigned char*)message, LENGTH_MSG, (unsigned char*)key, (unsigned char*)iv, (unsigned char*)cipherMessage);
+        int encryptedTextLen = encrypt(message, strlen ((char*) message), key, iv, cipherMessage);
+        // printf("%d\n", encryptedTextLen);
         /******Encryption ends here********/
-        send(sockfd, cipherMessage, LENGTH_MSG, 0);
+        //free memory
+        send(sockfd, cipherMessage, CIPHER_LEN, 0);
         if (strcmp(message, "exit") == 0) {
             break;
         }

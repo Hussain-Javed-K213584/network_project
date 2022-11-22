@@ -26,7 +26,6 @@ int encrypt(unsigned char *plaintext, int plaintext_len, unsigned char* key, uns
     
     if(1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_cfb128(), NULL, key, iv))
         handleErrors();
-
     
     if(1 != EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plaintext_len))
         handleErrors();
@@ -53,7 +52,6 @@ int decrypt(unsigned char *ciphertext, int ciphertext_len, unsigned char* key, u
     if(1 != EVP_DecryptInit_ex(ctx, EVP_aes_256_cfb128(), NULL, key, iv)) //init decryption
         handleErrors();
 
-    
     if(1 != EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, ciphertext_len)) //provide ciphertext and recieve plaintext
         handleErrors();
     plaintext_len = len;
